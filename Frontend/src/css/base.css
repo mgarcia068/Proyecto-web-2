@@ -112,6 +112,12 @@
   padding: 0;
 }
 
+/* Asegura que el atributo HTML `hidden` siempre oculte elementos,
+   incluso si hay reglas de display en estilos de autor (ej. .alert). */
+[hidden] {
+  display: none !important;
+}
+
 html {
   font-size: 16px;
   scroll-behavior: smooth;
