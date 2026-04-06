@@ -1,10 +1,9 @@
-// ── NAVEGACION ───────────────────────────────────────────────
 const SECCIONES = {
-  resumen:       { titulo: 'Resumen',          render: renderResumen },
-  ofertas:       { titulo: 'Mis ofertas',       render: renderOfertas },
-  postulantes:   { titulo: 'Postulantes',       render: renderPostulantesView },
-  'nueva-oferta':{ titulo: 'Publicar oferta',   render: renderNuevaOferta },
-  perfil:        { titulo: 'Perfil empresa',    render: renderPerfil },
+  resumen:        { titulo: 'Resumen',         render: renderResumen },
+  ofertas:        { titulo: 'Mis ofertas',      render: renderOfertas },
+  postulantes:    { titulo: 'Postulantes',      render: renderPostulantesView },
+  'nueva-oferta': { titulo: 'Publicar oferta',  render: renderNuevaOferta },
+  perfil:         { titulo: 'Perfil empresa',   render: renderPerfil },
 };
 
 let seccionActual = 'resumen';
@@ -21,13 +20,7 @@ function navigateTo(seccion, subtitulo) {
   }
 
   document.querySelectorAll('.sidebar__link').forEach(link => {
-    link.classList.remove('active');
-  });
-  const links = document.querySelectorAll('.sidebar__link');
-  links.forEach(link => {
-    if (link.getAttribute('onclick')?.includes(`'${seccion}'`)) {
-      link.classList.add('active');
-    }
+    link.classList.toggle('active', !!link.getAttribute('onclick')?.includes(`'${seccion}'`));
   });
 
   const content = document.getElementById('db-content');
@@ -40,13 +33,12 @@ function navigateTo(seccion, subtitulo) {
     });
   }
 
-  document.getElementById('sidebar')?.classList.remove('open');
+  closeMobileSidebar();
 }
 
 function renderResumen() {
   document.getElementById('db-content').innerHTML = `
     <div class="stats-grid" id="stats-container"></div>
-
     <div style="margin-top:var(--space-8)">
       <div class="section-header">
         <div>
@@ -60,7 +52,6 @@ function renderResumen() {
       </div>
     </div>
   `;
-
   renderStats('stats-container');
   renderOfertasTable('ofertas-resumen-container');
 }
@@ -70,7 +61,7 @@ function renderOfertas() {
     <div class="section-header">
       <div>
         <div class="section-header__title">Mis ofertas</div>
-        <div class="section-header__sub">Gestioná todas tus publicaciones</div>
+        <div class="section-header__sub">Gestiona todas tus publicaciones</div>
       </div>
       <button class="btn btn--primary btn--sm" onclick="navigateTo('nueva-oferta')">+ Nueva oferta</button>
     </div>
@@ -78,28 +69,23 @@ function renderOfertas() {
       <div id="ofertas-container"></div>
     </div>
   `;
-
   renderOfertasTable('ofertas-container');
 }
 
 function renderPostulantesView() {
   const oferta = ofertaActivaId ? OFERTAS.find(o => o.id === ofertaActivaId) : null;
-
   document.getElementById('db-content').innerHTML = `
     <div class="section-header">
       <div>
         <div class="section-header__title">
           ${oferta ? `Postulantes — ${oferta.titulo}` : 'Todos los postulantes'}
         </div>
-        <div class="section-header__sub">
-          Ordenados por compatibilidad segun IA
-        </div>
+        <div class="section-header__sub">Ordenados por compatibilidad segun IA</div>
       </div>
       ${ofertaActivaId ? `<button class="btn btn--ghost btn--sm" onclick="ofertaActivaId=null;navigateTo('postulantes')">Ver todos</button>` : ''}
     </div>
     <div id="postulantes-container"></div>
   `;
-
   renderPostulantes('postulantes-container', ofertaActivaId);
 }
 
@@ -113,11 +99,9 @@ function renderNuevaOferta() {
     </div>
     <div id="form-container"></div>
   `;
-
   renderFormOferta('form-container');
 }
 
-// ── DATOS DEL PERFIL (simulados, luego vendrán del backend) ──
 const PERFIL_EMPRESA = {
   nombre:      'TechCorp Argentina',
   rubro:       'Tecnologia & Software',
@@ -135,13 +119,12 @@ function renderPerfil() {
         <div class="section-header__title">Perfil de empresa</div>
         <div class="section-header__sub">Asi te ven los candidatos en la plataforma</div>
       </div>
-      <button class="btn btn--ghost btn--sm" onclick="togglePerfilEdit(true)">
+      <button class="btn btn--ghost btn--sm" id="btn-editar-perfil" onclick="togglePerfilEdit(true)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Editar perfil
       </button>
     </div>
 
-    <!-- VISTA PERFIL -->
     <div id="perfil-view" class="perfil-panel">
       <div class="perfil-cover">
         <div class="perfil-cover__bg"></div>
@@ -149,52 +132,44 @@ function renderPerfil() {
           <div class="avatar avatar--xl" style="width:80px;height:80px;font-size:var(--text-2xl)">TC</div>
         </div>
       </div>
-
       <div class="perfil-body">
-        <div class="perfil-body__main">
-          <div class="perfil-info">
-            <h2 class="perfil-info__nombre" id="view-nombre">${PERFIL_EMPRESA.nombre}</h2>
-            <p class="perfil-info__rubro" id="view-rubro">${PERFIL_EMPRESA.rubro}</p>
-            <div class="perfil-info__meta">
-              <span class="perfil-meta-item">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span id="view-ubicacion">${PERFIL_EMPRESA.ubicacion}</span>
-              </span>
-              <span class="perfil-meta-item">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span>Desde <span id="view-fundacion">${PERFIL_EMPRESA.fundacion}</span></span>
-              </span>
-              <span class="perfil-meta-item">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span id="view-empleados">${PERFIL_EMPRESA.empleados}</span> empleados
-              </span>
-              <a class="perfil-meta-item perfil-meta-item--link" id="view-web" href="${PERFIL_EMPRESA.web}" target="_blank">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <span id="view-web-text">${PERFIL_EMPRESA.web.replace('https://', '')}</span>
-              </a>
-            </div>
+        <div class="perfil-info">
+          <h2 class="perfil-info__nombre" id="view-nombre">${PERFIL_EMPRESA.nombre}</h2>
+          <p class="perfil-info__rubro" id="view-rubro">${PERFIL_EMPRESA.rubro}</p>
+          <div class="perfil-info__meta">
+            <span class="perfil-meta-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span id="view-ubicacion">${PERFIL_EMPRESA.ubicacion}</span>
+            </span>
+            <span class="perfil-meta-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Desde <span id="view-fundacion">${PERFIL_EMPRESA.fundacion}</span>
+            </span>
+            <span class="perfil-meta-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span id="view-empleados">${PERFIL_EMPRESA.empleados}</span> empleados
+            </span>
+            <a class="perfil-meta-item perfil-meta-item--link" id="view-web" href="${PERFIL_EMPRESA.web}" target="_blank">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span id="view-web-text">${PERFIL_EMPRESA.web.replace('https://', '')}</span>
+            </a>
           </div>
-
-          <div class="perfil-desc">
-            <div class="perfil-desc__label">Sobre la empresa</div>
-            <p class="perfil-desc__text" id="view-descripcion">${PERFIL_EMPRESA.descripcion}</p>
-          </div>
-
-          <div class="perfil-ofertas-activas">
-            <div class="perfil-desc__label">Ofertas activas</div>
-            <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-3)">
-              ${OFERTAS.filter(o => o.estado === 'activa').map(o => `
-                <span class="badge badge--accent" style="cursor:pointer" onclick="verPostulantes(${o.id})">
-                  ${o.titulo}
-                </span>
-              `).join('')}
-            </div>
+        </div>
+        <div class="perfil-desc">
+          <div class="perfil-desc__label">Sobre la empresa</div>
+          <p class="perfil-desc__text" id="view-descripcion">${PERFIL_EMPRESA.descripcion}</p>
+        </div>
+        <div class="perfil-ofertas-activas">
+          <div class="perfil-desc__label">Ofertas activas</div>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-3)">
+            ${OFERTAS.filter(o => o.estado === 'activa').map(o => `
+              <span class="badge badge--accent" style="cursor:pointer" onclick="verPostulantes(${o.id})">${o.titulo}</span>
+            `).join('')}
           </div>
         </div>
       </div>
     </div>
 
-    <!-- FORMULARIO EDICION (oculto por defecto) -->
     <div id="perfil-edit" class="perfil-panel" style="display:none">
       <div class="form-card">
         <div class="form-card__title">Editar informacion de la empresa</div>
@@ -222,11 +197,11 @@ function renderPerfil() {
           <div class="form-group">
             <label class="form-label">Cantidad de empleados</label>
             <select class="form-select" id="edit-empleados">
-              <option ${PERFIL_EMPRESA.empleados === '1-10'    ? 'selected' : ''}>1-10</option>
-              <option ${PERFIL_EMPRESA.empleados === '10-50'   ? 'selected' : ''}>10-50</option>
-              <option ${PERFIL_EMPRESA.empleados === '50-100'  ? 'selected' : ''}>50-100</option>
-              <option ${PERFIL_EMPRESA.empleados === '100-500' ? 'selected' : ''}>100-500</option>
-              <option ${PERFIL_EMPRESA.empleados === '500+'    ? 'selected' : ''}>500+</option>
+              <option ${PERFIL_EMPRESA.empleados==='1-10'    ?'selected':''}>1-10</option>
+              <option ${PERFIL_EMPRESA.empleados==='10-50'   ?'selected':''}>10-50</option>
+              <option ${PERFIL_EMPRESA.empleados==='50-100'  ?'selected':''}>50-100</option>
+              <option ${PERFIL_EMPRESA.empleados==='100-500' ?'selected':''}>100-500</option>
+              <option ${PERFIL_EMPRESA.empleados==='500+'    ?'selected':''}>500+</option>
             </select>
           </div>
           <div class="form-group">
@@ -246,7 +221,7 @@ function renderPerfil() {
 function togglePerfilEdit(editar) {
   const view = document.getElementById('perfil-view');
   const edit = document.getElementById('perfil-edit');
-  const btn  = document.querySelector('.section-header .btn--ghost');
+  const btn  = document.getElementById('btn-editar-perfil');
   if (!view || !edit) return;
 
   if (editar) {
@@ -291,24 +266,19 @@ function guardarPerfil() {
   PERFIL_EMPRESA.empleados   = document.getElementById('edit-empleados')?.value          || PERFIL_EMPRESA.empleados;
   PERFIL_EMPRESA.fundacion   = document.getElementById('edit-fundacion')?.value          || PERFIL_EMPRESA.fundacion;
 
-  document.getElementById('view-nombre')?.textContent      !== undefined && (document.getElementById('view-nombre').textContent      = PERFIL_EMPRESA.nombre);
-  document.getElementById('view-rubro')?.textContent       !== undefined && (document.getElementById('view-rubro').textContent       = PERFIL_EMPRESA.rubro);
-  document.getElementById('view-descripcion')?.textContent !== undefined && (document.getElementById('view-descripcion').textContent = PERFIL_EMPRESA.descripcion);
-  document.getElementById('view-ubicacion')?.textContent   !== undefined && (document.getElementById('view-ubicacion').textContent   = PERFIL_EMPRESA.ubicacion);
-  document.getElementById('view-empleados')?.textContent   !== undefined && (document.getElementById('view-empleados').textContent   = PERFIL_EMPRESA.empleados);
-  document.getElementById('view-fundacion')?.textContent   !== undefined && (document.getElementById('view-fundacion').textContent   = PERFIL_EMPRESA.fundacion);
+  document.getElementById('view-nombre').textContent      = PERFIL_EMPRESA.nombre;
+  document.getElementById('view-rubro').textContent       = PERFIL_EMPRESA.rubro;
+  document.getElementById('view-descripcion').textContent = PERFIL_EMPRESA.descripcion;
+  document.getElementById('view-ubicacion').textContent   = PERFIL_EMPRESA.ubicacion;
+  document.getElementById('view-empleados').textContent   = PERFIL_EMPRESA.empleados;
+  document.getElementById('view-fundacion').textContent   = PERFIL_EMPRESA.fundacion;
   const webEl = document.getElementById('view-web');
   if (webEl) {
     webEl.href = PERFIL_EMPRESA.web;
     document.getElementById('view-web-text').textContent = PERFIL_EMPRESA.web.replace('https://', '');
   }
-
   togglePerfilEdit(false);
 }
-
-document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
-  document.getElementById('sidebar')?.classList.toggle('open');
-});
 
 const style = document.createElement('style');
 style.textContent = `
@@ -319,6 +289,27 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+function openMobileSidebar() {
+  document.getElementById('sidebar')?.classList.add('open');
+  document.getElementById('sidebar-overlay')?.classList.add('visible');
+}
+
+function closeMobileSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('visible');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   navigateTo('resumen');
+
+  document.getElementById('sidebar-collapse')?.addEventListener('click', () => {
+    document.getElementById('sidebar')?.classList.toggle('collapsed');
+  });
+
+  document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    sidebar?.classList.contains('open') ? closeMobileSidebar() : openMobileSidebar();
+  });
+
+  document.getElementById('sidebar-overlay')?.addEventListener('click', closeMobileSidebar);
 });
