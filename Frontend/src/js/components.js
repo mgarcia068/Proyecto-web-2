@@ -7,6 +7,62 @@ const isLanding =
   window.location.pathname === "/" ||
   window.location.pathname.endsWith("index.html");
 
+function safeJsonParse(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function normalizeRole(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "candidato" || normalized === "cliente") return "candidato";
+  if (normalized === "empresa") return "empresa";
+  return "";
+}
+
+function getCurrentUser() {
+  const raw = localStorage.getItem("ApplyAI.currentUser");
+  if (!raw) return null;
+  const parsed = safeJsonParse(raw, null);
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const email = String(parsed.email || "").trim().toLowerCase();
+  const role = normalizeRole(parsed.role);
+  const fullName = String(parsed.fullName || "").trim();
+
+  if (!email || !role) return null;
+  return { email, role, fullName };
+}
+
+function updateNavbarActions() {
+  const actions = document.querySelector(".navbar__actions");
+  if (!actions) return;
+
+  const user = getCurrentUser();
+  if (!user) {
+    actions.innerHTML = `
+      <a href="login.html" class="btn btn--ghost btn--sm">Iniciar sesion</a>
+      <a href="register.html" class="btn btn--primary btn--sm">Registrarse</a>
+    `;
+    return;
+  }
+
+  if (user.role === "candidato") {
+    actions.innerHTML = `
+      <a href="dashboard-candidato.html" class="btn btn--ghost btn--sm">Postulaciones</a>
+      <a href="perfil-candidato.html" class="btn btn--primary btn--sm">Mi perfil</a>
+    `;
+    return;
+  }
+
+  // empresa
+  actions.innerHTML = `
+    <a href="dashboard-empresa.html" class="btn btn--primary btn--sm">Mi panel</a>
+  `;
+}
+
 async function loadComponent(url, placeholderId) {
   const placeholder = document.getElementById(placeholderId);
   if (!placeholder) return;
@@ -54,6 +110,7 @@ async function init() {
   await loadComponent("components/footer.html", "footer-placeholder");
 
   initNavbar();
+  updateNavbarActions();
   markActiveLink();
 }
 
