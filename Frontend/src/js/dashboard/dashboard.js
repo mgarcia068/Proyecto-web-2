@@ -464,3 +464,24 @@ function guardarOferta(ofertaId) {
     filtrarOfertas();
   }
 }
+
+// User Dropdown toggle
+document.addEventListener("DOMContentLoaded", () => {
+    const userBtn = document.getElementById("topbar-user-btn");
+    const userDropdown = document.getElementById("topbar-user-dropdown");
+
+    if (userBtn && userDropdown) {
+        userBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            userDropdown.classList.toggle("show");
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener("click", (e) => {
+            if (!userDropdown.contains(e.target)) {
+                userDropdown.classList.remove("show");
+            }
+        });
+    }
+});
+

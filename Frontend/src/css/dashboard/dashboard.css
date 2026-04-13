@@ -30,7 +30,7 @@
 }
 
 .stat-card:hover {
-  border-color: rgba(249, 115, 22, 0.3);
+  border-color: var(--color-accent);
   transform: translateY(-2px);
 }
 
@@ -214,7 +214,7 @@
 }
 
 .applicant-card:hover {
-  border-color: rgba(249, 115, 22, 0.3);
+  border-color: var(--color-accent);
   transform: translateY(-2px);
 }
 
@@ -698,4 +698,85 @@
   opacity: 1;
   transform: translate(-50%, -50%);
   visibility: visible;
+}
+
+/* ── DROPDOWN PERFIL USUARIO ───────────────────────────────── */
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: 220px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-2) 0;
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: all var(--transition-fast);
+}
+
+.user-dropdown.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.user-dropdown__header {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-dropdown__name {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-dropdown__email {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-dropdown .divider {
+  margin: var(--space-2) 0;
+}
+
+.user-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.user-dropdown__item svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.user-dropdown__item:hover svg {
+  opacity: 1;
+}
+
+.user-dropdown__item:hover {
+  background: var(--color-bg-3);
+  color: var(--color-text);
 }
