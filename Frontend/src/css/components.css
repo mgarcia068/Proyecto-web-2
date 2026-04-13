@@ -199,3 +199,7 @@
     display: none;
   }
 }
+.input-error {
+  border-color: var(--color-error) !important;
+  background-color: var(--color-error-soft) !important;
+}
