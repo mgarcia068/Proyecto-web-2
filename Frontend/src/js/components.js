@@ -516,7 +516,16 @@ function updateNavbarActions() {
 
     // Update user info
     const profile = isEmpresa ? null : getCandidateProfile(user.email);
-    const displayName = profile?.fullName || user.fullName || user.email;
+    let displayName = profile?.fullName || user.fullName || user.email;
+    if (isEmpresa) {
+        try {
+            const savedRaw = localStorage.getItem(`ApplyAI.perfilEmpresa_${user.email}`);
+            if (savedRaw) {
+               const saved = JSON.parse(savedRaw);
+               if (saved.nombre) displayName = saved.nombre;
+            }
+        } catch(e){}
+    }
     const initials = initialsFromName(displayName);
     
     const nameEl = document.getElementById("navbar-user-name");

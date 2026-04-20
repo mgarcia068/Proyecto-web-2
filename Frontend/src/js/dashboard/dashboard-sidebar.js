@@ -185,8 +185,17 @@ function renderNuevaOferta() {
   renderFormOferta('form-container');
 }
 
-const PERFIL_EMPRESA = {
-  nombre:      'TechCorp Argentina',
+let currentUser = null;
+try {
+  const currentUserRaw = localStorage.getItem('ApplyAI.currentUser');
+  if (currentUserRaw) currentUser = JSON.parse(currentUserRaw);
+} catch (e) {}
+
+const companyEmail = currentUser?.email || 'default@empresa.com';
+const companyName = currentUser?.fullName || 'TechCorp Argentina';
+
+let PERFIL_EMPRESA = {
+  nombre:      companyName,
   rubro:       'Tecnologia & Software',
   descripcion: 'Empresa de desarrollo de software con foco en soluciones B2B para el mercado latinoamericano.',
   web:         'https://techcorp.com.ar',
@@ -194,6 +203,14 @@ const PERFIL_EMPRESA = {
   empleados:   '50-100',
   fundacion:   '2018',
 };
+
+try {
+  const savedPerfilRaw = localStorage.getItem(`ApplyAI.perfilEmpresa_${companyEmail}`);
+  if (savedPerfilRaw) {
+    const savedPerfil = JSON.parse(savedPerfilRaw);
+    PERFIL_EMPRESA = { ...PERFIL_EMPRESA, ...savedPerfil };
+  }
+} catch (e) {}
 
 function renderPerfil() {
   document.getElementById('db-content').innerHTML = `
@@ -349,6 +366,31 @@ function guardarPerfil() {
   PERFIL_EMPRESA.empleados   = document.getElementById('edit-empleados')?.value          || PERFIL_EMPRESA.empleados;
   PERFIL_EMPRESA.fundacion   = document.getElementById('edit-fundacion')?.value          || PERFIL_EMPRESA.fundacion;
 
+  try {
+    localStorage.setItem(`ApplyAI.perfilEmpresa_${companyEmail}`, JSON.stringify(PERFIL_EMPRESA));
+    
+    // Update company names in sidebar/nav if they exist
+    document.querySelectorAll('.sidebar__empresa-nombre, .user-dropdown__name').forEach(el => {
+      el.textContent = PERFIL_EMPRESA.nombre;
+    });
+
+    const emailEls = document.querySelectorAll('.user-dropdown__email');
+    emailEls.forEach(el => {
+      el.textContent = companyEmail;
+    });
+
+    const rawName = PERFIL_EMPRESA.nombre.trim();
+    const initials = rawName.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || 'TC';
+    document.querySelectorAll('#topbar-user-btn, .avatar--xl').forEach(el => {
+      if (el.tagName === 'BUTTON' || el.classList.contains('avatar--xl')) {
+        el.textContent = initials;
+      }
+    });
+
+  } catch (e) {
+    console.error('Error saving company profile:', e);
+  }
+
   document.getElementById('view-nombre').textContent      = PERFIL_EMPRESA.nombre;
   document.getElementById('view-rubro').textContent       = PERFIL_EMPRESA.rubro;
   document.getElementById('view-descripcion').textContent = PERFIL_EMPRESA.descripcion;
@@ -383,6 +425,24 @@ function closeMobileSidebar() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Update hardcoded names in header and sidebar
+  document.querySelectorAll('.sidebar__empresa-nombre, .user-dropdown__name').forEach(el => {
+    el.textContent = PERFIL_EMPRESA.nombre;
+  });
+
+  const emailEls = document.querySelectorAll('.user-dropdown__email');
+  emailEls.forEach(el => {
+    el.textContent = companyEmail;
+  });
+
+  const rawName = PERFIL_EMPRESA.nombre.trim();
+  const initials = rawName.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || 'TC';
+  document.querySelectorAll('#topbar-user-btn').forEach(el => {
+    if (el.tagName === 'BUTTON') {
+      el.textContent = initials;
+    }
+  });
+
   navigateTo('resumen');
 
   document.getElementById('sidebar-collapse')?.addEventListener('click', () => {

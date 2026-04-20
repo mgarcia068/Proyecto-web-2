@@ -96,16 +96,59 @@
   function resolveCompanyContext() {
     const requested = String(getQueryParam('company') || '').trim();
     const requestedId = requested ? slugify(requested) : '';
+
+    if (!requested) {
+      try {
+        const currentUserRaw = localStorage.getItem('ApplyAI.currentUser');
+        if (currentUserRaw) {
+          const currentUser = JSON.parse(currentUserRaw);
+          if (currentUser.role === 'empresa') {
+            const companyEmail = currentUser.email;
+            let companyName = currentUser.fullName || 'Mi Empresa';
+            
+            let profile = {
+              id: slugify(companyName),
+              name: companyName,
+              tagline: 'Empresa de desarrollo de software con foco en soluciones B2B para el mercado latinoamericano.',
+              description: 'Empresa de desarrollo de software con foco en soluciones B2B... (Por defecto)',
+              industry: 'Tecnologia & Software',
+              location: 'Buenos Aires, Argentina',
+              website: 'www.miempresa.com',
+              offers: [],
+              isOwnProfile: true
+            };
+
+            const savedRaw = localStorage.getItem(`ApplyAI.perfilEmpresa_${companyEmail}`);
+            if (savedRaw) {
+               const saved = JSON.parse(savedRaw);
+               profile.name = saved.nombre || profile.name;
+               profile.industry = saved.rubro || profile.industry;
+               profile.tagline = saved.descripcion || profile.tagline; // In dashboard-sidebar it is 'descripcion'
+               profile.description = saved.descripcion || profile.description;
+               profile.website = saved.web || profile.website;
+               profile.location = saved.ubicacion || profile.location;
+            }
+            return profile;
+          }
+        }
+      } catch(e){}
+    }
+
     const fallback = COMPANY_CATALOG.techcorp;
+    fallback.description = 'En TechCorp Argentina nos especializamos en la creación de soluciones de software a medida...';
 
     const fromCatalog = requestedId && COMPANY_CATALOG[requestedId] ? COMPANY_CATALOG[requestedId] : null;
-    if (fromCatalog) return fromCatalog;
+    if (fromCatalog) {
+      fromCatalog.description = fromCatalog.tagline;
+      return fromCatalog;
+    }
 
     if (requested) {
       return {
         id: requestedId || slugify(requested) || 'empresa',
         name: requested,
         tagline: 'Perfil de empresa',
+        description: 'Perfil público de ' + requested,
         industry: '—',
         location: '—',
         website: '#',
@@ -186,11 +229,13 @@
     const locationEl = document.getElementById('companyLocation');
     const websiteEl = document.getElementById('companyWebsite');
     const logoEl = document.getElementById('companyLogo');
+    const descriptionEl = document.getElementById('companyDescription'); // added for description
 
     if (nameEl) nameEl.textContent = company.name || 'Empresa';
     if (taglineEl) taglineEl.textContent = company.tagline || '';
     if (industryEl) industryEl.textContent = company.industry || '—';
     if (locationEl) locationEl.textContent = company.location || '—';
+    if (descriptionEl) descriptionEl.textContent = company.description || company.tagline || '';
     if (websiteEl) {
       websiteEl.textContent = company.website || '';
       websiteEl.href = company.website && company.website !== '#' ? `https://${company.website.replace(/^https?:\/\//, '')}` : '#';
