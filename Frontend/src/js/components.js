@@ -67,6 +67,50 @@ function getCandidateProfile(email) {
   }
 }
 
+function handleGlobalLogout() {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;transition:opacity 0.2s ease;";
+
+  const modal = document.createElement("div");
+  modal.className = "card";
+  modal.style.cssText = "background:var(--color-bg);padding:var(--space-6);border-radius:var(--radius-lg);width:90%;max-width:400px;transform:translateY(20px);transition:transform 0.2s ease;box-shadow:var(--shadow-lg);";
+  
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);">
+      <div style="width:40px;height:40px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;color:var(--color-error);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </div>
+      <h3 style="margin:0;font-size:var(--text-lg);color:var(--color-text);">Cerrar sesión</h3>
+    </div>
+    <p style="margin-bottom:var(--space-6);color:var(--color-text-muted);font-size:var(--text-sm);">¿Estás seguro de que deseas salir de tu cuenta? Tendrás que volver a ingresar tus credenciales para acceder a tus datos.</p>
+    <div style="display:flex;justify-content:flex-end;gap:var(--space-3);">
+      <button class="btn btn--ghost" id="btn-cancel-logout">Cancelar</button>
+      <button class="btn btn--primary" id="btn-confirm-logout" style="background:var(--color-error);border-color:var(--color-error);color:white;">Sí, cerrar sesión</button>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Animación de entrada
+  requestAnimationFrame(() => {
+    overlay.style.opacity = "1";
+    modal.style.transform = "translateY(0)";
+  });
+
+  const close = () => {
+    overlay.style.opacity = "0";
+    modal.style.transform = "translateY(20px)";
+    setTimeout(() => overlay.remove(), 200);
+  };
+
+  document.getElementById("btn-cancel-logout").onclick = close;
+  document.getElementById("btn-confirm-logout").onclick = () => {
+    localStorage.removeItem("ApplyAI.currentUser");
+    window.location.href = resolvePathForContext("index.html");
+  };
+}
+
 function initialsFromName(name) {
   const clean = String(name || "").trim();
   if (!clean) return "?";
@@ -273,6 +317,20 @@ function ensureNavbarDom() {
   const profileBtn = ensureElementId(document.getElementById("navbar-profile-btn") || userMenu.querySelector("#navbar-profile-btn") || userMenu.querySelector("button"), "navbar-profile-btn");
   ensureButtonLabel(profileBtn, "Mi perfil");
 
+  let empresaPanelBtn = document.getElementById("navbar-empresa-panel-btn") || userMenu.querySelector("#navbar-empresa-panel-btn");
+  if (!empresaPanelBtn && userDropdown) {
+    empresaPanelBtn = document.createElement("button");
+    empresaPanelBtn.type = "button";
+    empresaPanelBtn.className = "user-dropdown__item";
+    empresaPanelBtn.id = "navbar-empresa-panel-btn";
+    empresaPanelBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+      <span>Mi panel</span>
+    `;
+    profileBtn?.insertAdjacentElement("afterend", empresaPanelBtn);
+  }
+  ensureButtonLabel(empresaPanelBtn, "Mi panel");
+
   let offersBtn = document.getElementById("navbar-offers-btn") || userMenu.querySelector("#navbar-offers-btn");
   if (!offersBtn && userDropdown) {
     // Insert after profile.
@@ -383,68 +441,71 @@ function updateNavbarActions() {
 
   if (publicThemeToggle) publicThemeToggle.style.display = "none";
 
-  // Hay usuario: ocultar login/register, mostrar menu si es candidato
+  // Hay usuario: ocultar login/register, mostrar menu para ambos
   if (loginBtn) loginBtn.style.display = "none";
   if (registerBtn) registerBtn.style.display = "none";
+  if (dashboardBtn) dashboardBtn.hidden = true;
 
-  if (user.role === "candidato") {
-    if (dashboardBtn) dashboardBtn.hidden = true;
-    // Show user dropdown
-    if (userMenu) {
-      userMenu.hidden = false;
-      
-      // Update user info
-      const profile = getCandidateProfile(user.email);
-      const displayName = profile?.fullName || user.fullName || user.email;
-      const initials = initialsFromName(displayName);
-      
-      const nameEl = document.getElementById("navbar-user-name");
-      const locationEl = document.getElementById("navbar-user-location");
-      const emailEl = document.getElementById("navbar-user-email");
-      const avatarEl = document.getElementById("navbar-user-avatar");
-      const avatarImgEl = document.getElementById("navbar-user-avatar-img");
-      const avatarFallbackEl = document.getElementById("navbar-user-avatar-fallback");
-      
-      if (nameEl) nameEl.textContent = displayName;
+  if (userMenu) {
+    userMenu.hidden = false;
+    
+    const isEmpresa = user.role === "empresa";
+    const profileBtn = document.getElementById("navbar-profile-btn");
+    const empresaPanelBtn = document.getElementById("navbar-empresa-panel-btn");
+    const offersBtn = document.getElementById("navbar-offers-btn");
+    const applicationsBtn = document.getElementById("navbar-applications-btn");
 
-      const locationText = String(profile?.location || "").trim();
-      if (locationEl) {
-        if (locationText) {
-          locationEl.textContent = locationText;
-          locationEl.hidden = false;
-        } else {
-          locationEl.textContent = "—";
-          locationEl.hidden = true;
-        }
-      }
+    if (profileBtn) profileBtn.style.display = isEmpresa ? "none" : "";
+    if (empresaPanelBtn) empresaPanelBtn.style.display = isEmpresa ? "" : "none";
+    if (offersBtn) offersBtn.style.display = isEmpresa ? "none" : "";
+    if (applicationsBtn) applicationsBtn.style.display = isEmpresa ? "none" : "";
 
-      if (emailEl) emailEl.textContent = user.email;
+    // Update user info
+    const profile = isEmpresa ? null : getCandidateProfile(user.email);
+    const displayName = profile?.fullName || user.fullName || user.email;
+    const initials = initialsFromName(displayName);
+    
+    const nameEl = document.getElementById("navbar-user-name");
+    const locationEl = document.getElementById("navbar-user-location");
+    const emailEl = document.getElementById("navbar-user-email");
+    const avatarEl = document.getElementById("navbar-user-avatar");
+    const avatarImgEl = document.getElementById("navbar-user-avatar-img");
+    const avatarFallbackEl = document.getElementById("navbar-user-avatar-fallback");
+    
+    if (nameEl) nameEl.textContent = displayName;
 
-      if (avatarFallbackEl) avatarFallbackEl.textContent = initials;
-
-      const photoDataUrl = String(profile?.photoDataUrl || "").trim();
-      if (photoDataUrl && avatarEl && avatarImgEl) {
-        avatarImgEl.src = photoDataUrl;
-        avatarImgEl.hidden = false;
-        if (avatarFallbackEl) avatarFallbackEl.hidden = true;
-
-        // Match the crop/pan behavior from the candidate profile editor.
-        applyPhotoPan(avatarImgEl, avatarEl, getPhotoPan(profile), 1.18);
+    const locationText = String(profile?.location || "").trim();
+    if (locationEl) {
+      if (locationText) {
+        locationEl.textContent = locationText;
+        locationEl.hidden = false;
       } else {
-        if (avatarImgEl) {
-          avatarImgEl.hidden = true;
-          avatarImgEl.removeAttribute("src");
-          clearPhotoPan(avatarImgEl);
-        }
-        if (avatarFallbackEl) avatarFallbackEl.hidden = false;
+        locationEl.textContent = "—";
+        locationEl.hidden = true;
       }
     }
-    return;
-  }
 
-  // empresa
-  if (userMenu) userMenu.hidden = true;
-  if (dashboardBtn) dashboardBtn.hidden = false;
+    if (emailEl) emailEl.textContent = user.email;
+
+    if (avatarFallbackEl) avatarFallbackEl.textContent = initials;
+
+    const photoDataUrl = String(profile?.photoDataUrl || "").trim();
+    if (photoDataUrl && avatarEl && avatarImgEl) {
+      avatarImgEl.src = photoDataUrl;
+      avatarImgEl.hidden = false;
+      if (avatarFallbackEl) avatarFallbackEl.hidden = true;
+
+      // Match the crop/pan behavior from the candidate profile editor.
+      applyPhotoPan(avatarImgEl, avatarEl, getPhotoPan(profile), 1.18);
+    } else {
+      if (avatarImgEl) {
+        avatarImgEl.hidden = true;
+        avatarImgEl.removeAttribute("src");
+        clearPhotoPan(avatarImgEl);
+      }
+      if (avatarFallbackEl) avatarFallbackEl.hidden = false;
+    }
+  }
 }
 
 function initNavbarDashboardButton() {
@@ -506,6 +567,7 @@ function initNavbarUserDropdown() {
   const userBtn = document.getElementById("navbar-user-btn");
   const userDropdown = document.getElementById("navbar-user-dropdown");
   const profileBtn = document.getElementById("navbar-profile-btn");
+  const empresaPanelBtn = document.getElementById("navbar-empresa-panel-btn");
   const offersBtn = document.getElementById("navbar-offers-btn");
   const applicationsBtn = document.getElementById("navbar-applications-btn");
   const themeToggleBtn = document.getElementById("navbar-theme-toggle-btn");
@@ -531,10 +593,17 @@ function initNavbarUserDropdown() {
     e.stopPropagation();
   });
 
-  // Profile button
+  // Profile button (Candidato)
   if (profileBtn) {
     profileBtn.addEventListener("click", () => {
       window.location.href = resolvePathForContext("perfil-candidato.html");
+    });
+  }
+
+  // Panel button (Empresa)
+  if (empresaPanelBtn) {
+    empresaPanelBtn.addEventListener("click", () => {
+      window.location.href = resolvePagePath("dashboard-empresa.html");
     });
   }
 
@@ -564,8 +633,12 @@ function initNavbarUserDropdown() {
   // Logout button
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
-      localStorage.removeItem("ApplyAI.currentUser");
-      window.location.href = resolvePathForContext("index.html");
+      if (typeof handleGlobalLogout === "function") {
+        handleGlobalLogout();
+      } else {
+        localStorage.removeItem("ApplyAI.currentUser");
+        window.location.href = resolvePathForContext("index.html");
+      }
     });
   }
 }
