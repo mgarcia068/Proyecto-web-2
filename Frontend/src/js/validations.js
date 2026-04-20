@@ -4,10 +4,22 @@
     currentUser: 'ApplyAI.currentUser',
   };
 
+  function resolveFromSrcRoot(pathFromRoot) {
+    const marker = '/pages/';
+    const pathname = window.location.pathname;
+    const markerIndex = pathname.lastIndexOf(marker);
+    if (markerIndex === -1) return pathFromRoot;
+
+    const rest = pathname.slice(markerIndex + marker.length);
+    const depth = rest.split('/').filter(Boolean).length || 1;
+    return `${'../'.repeat(depth)}${pathFromRoot}`;
+  }
+
   function getDashboardForRole(role) {
-    return role === 'empresa'
+    const target = role === 'empresa'
       ? 'pages/dashboard-empresa.html'
       : 'pages/dashboard-candidato.html';
+    return resolveFromSrcRoot(target);
   }
 
   function getGoogleClientIdFromMeta() {

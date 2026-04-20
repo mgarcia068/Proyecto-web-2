@@ -71,6 +71,17 @@
     return '';
   }
 
+  function resolveFromSrcRoot(pathFromRoot) {
+    const marker = '/pages/';
+    const pathname = window.location.pathname;
+    const markerIndex = pathname.lastIndexOf(marker);
+    if (markerIndex === -1) return pathFromRoot;
+
+    const rest = pathname.slice(markerIndex + marker.length);
+    const depth = rest.split('/').filter(Boolean).length || 1;
+    return `${'../'.repeat(depth)}${pathFromRoot}`;
+  }
+
   function getCurrentUser() {
     const raw = localStorage.getItem(STORAGE_KEYS.currentUser);
     if (!raw) return null;
@@ -299,7 +310,7 @@
           } catch (_) {
             // ignore
           }
-          window.location.href = 'index.html';
+          window.location.href = resolveFromSrcRoot('index.html');
         }
       });
     }

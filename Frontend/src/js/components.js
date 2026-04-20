@@ -8,20 +8,40 @@ const isLanding =
   window.location.pathname.endsWith("index.html");
 
 function isInPagesDir() {
-  return window.location.pathname.includes("/pages/");
+  return getPagesNestingDepth() > 0;
+}
+
+function getPagesNestingDepth() {
+  const marker = "/pages/";
+  const pathname = window.location.pathname;
+  const markerIndex = pathname.lastIndexOf(marker);
+  if (markerIndex === -1) return 0;
+
+  const rest = pathname.slice(markerIndex + marker.length);
+  const segments = rest.split("/").filter(Boolean);
+  return segments.length || 1;
+}
+
+function getRootPrefix() {
+  const depth = getPagesNestingDepth();
+  return depth > 0 ? "../".repeat(depth) : "";
 }
 
 function resolvePathForContext(pathFromRoot) {
-  // pathFromRoot is relative to Frontend/src (e.g. 'login.html', 'pages/dashboard-candidato.html')
-  // If we're currently inside Frontend/src/pages, we need to go up one level.
-  return isInPagesDir() ? `../${pathFromRoot}` : pathFromRoot;
+  // pathFromRoot is relative to Frontend/src (e.g. 'pages/auth/login.html', 'pages/dashboard-candidato.html')
+  return `${getRootPrefix()}${pathFromRoot}`;
 }
 
 function resolvePagePath(pageFileName) {
   // For pages that live inside Frontend/src/pages/
   // - from root pages: 'pages/<file>'
-  // - from pages dir: '<file>'
-  return isInPagesDir() ? pageFileName : `pages/${pageFileName}`;
+  // - from /pages: '<file>'
+  // - from /pages/<subdir>: '../<file>'
+  if (!isInPagesDir()) return `pages/${pageFileName}`;
+
+  const depth = getPagesNestingDepth();
+  const prefixToPagesRoot = "../".repeat(Math.max(0, depth - 1));
+  return `${prefixToPagesRoot}${pageFileName}`;
 }
 
 function safeJsonParse(value, fallback) {
@@ -660,7 +680,7 @@ function initNavbarUserDropdown() {
   // Profile button (Candidato)
   if (profileBtn) {
     profileBtn.addEventListener("click", () => {
-      window.location.href = resolvePathForContext("perfil-candidato.html");
+      window.location.href = resolvePathForContext("pages/candidato/perfil-candidato.html");
     });
   }
 
