@@ -66,6 +66,13 @@
     }
   }
 
+  function normalizeRole(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'candidato' || normalized === 'cliente') return 'candidato';
+    if (normalized === 'empresa') return 'empresa';
+    return '';
+  }
+
   function normalizeText(value) {
     return String(value || '')
       .trim()
@@ -194,30 +201,49 @@
   }
 
   function checkAccess(company) {
+    const favoriteBtn = document.getElementById('favoriteCompanyBtn');
+    if (!favoriteBtn) return;
+
+    const service = window.ApplyAI?.followedCompanies;
+    const fromService = typeof service?.getCurrentUser === 'function' ? service.getCurrentUser() : null;
     const raw = localStorage.getItem('ApplyAI.currentUser');
-    if (!raw) {
-      window.location.href = '../index.html';
+    const fromStorage = raw ? safeJsonParse(raw, null) : null;
+    const user = fromService || fromStorage;
+
+    const role = normalizeRole(user?.role);
+    const email = String(user?.email || '').trim().toLowerCase();
+
+    // Perfil público: no redirigir. Solo habilitar seguir a candidatos logueados.
+    if (!email) {
+      applyFollowUiState(false, {
+        disabled: true,
+        label: 'Iniciar sesión',
+        title: 'Inicia sesión como candidato para seguir a la empresa',
+      });
       return;
     }
 
-    try {
-      const user = JSON.parse(raw);
-      if (user.role === 'empresa') {
-        const favoriteBtn = document.getElementById('favoriteCompanyBtn');
-        if (favoriteBtn) {
-          favoriteBtn.disabled = true;
-          favoriteBtn.title = 'Inicia sesión como candidato para seguir a la empresa';
-        }
-      } else if (user.role === 'candidato') {
-        // Al entrar, reflejar estado actual (según storage)
-        const service = window.ApplyAI?.followedCompanies;
-        const email = String(user.email || '').trim().toLowerCase();
-        const isFollowing = Boolean(service && email && service.isFollowing(email, company?.id));
-        applyFollowUiState(Boolean(isFollowing));
-      }
-    } catch(e) {
-      window.location.href = '../index.html';
+    if (role !== 'candidato') {
+      applyFollowUiState(false, {
+        disabled: true,
+        label: 'No disponible',
+        title: 'Solo cuentas candidato pueden seguir empresas',
+      });
+      return;
     }
+
+    if (!service) {
+      applyFollowUiState(false, {
+        disabled: true,
+        label: 'No disponible',
+        title: 'La función de seguimiento no está disponible en este momento',
+      });
+      return;
+    }
+
+    const companyId = String(company?.id || slugify(company?.name || '')).trim();
+    const isFollowing = Boolean(service && companyId && service.isFollowing(email, companyId));
+    applyFollowUiState(Boolean(isFollowing), { disabled: false });
   }
 
   function renderCompanyHeader(company) {
@@ -271,27 +297,46 @@
     }
   }
 
-  function applyFollowUiState(isFollowing) {
+  function applyFollowUiState(isFollowing, options) {
     const favoriteBtn = document.getElementById('favoriteCompanyBtn');
-    setFavoriteIcon(Boolean(isFollowing));
     if (!favoriteBtn) return;
-    favoriteBtn.title = isFollowing ? 'Siguiendo empresa (quitar de favoritas)' : 'Seguir empresa (añadir a favoritas)';
+
+    const cfg = options && typeof options === 'object' ? options : {};
+    const disabled = Boolean(cfg.disabled);
+    const labelEl = favoriteBtn.querySelector('[data-follow-label]');
+
+    setFavoriteIcon(Boolean(isFollowing) && !disabled);
+
+    favoriteBtn.disabled = disabled;
+    favoriteBtn.classList.toggle('is-disabled', disabled);
+    favoriteBtn.classList.toggle('is-following', Boolean(isFollowing) && !disabled);
+
+    const label = String(
+      cfg.label || (isFollowing ? 'Siguiendo' : 'Seguir')
+    ).trim();
+    if (labelEl) labelEl.textContent = label;
+
+    favoriteBtn.title = String(
+      cfg.title || (isFollowing ? 'Siguiendo empresa (quitar de favoritas)' : 'Seguir empresa (añadir a favoritas)')
+    );
     favoriteBtn.setAttribute('aria-label', favoriteBtn.title);
+    favoriteBtn.setAttribute('aria-pressed', String(Boolean(isFollowing) && !disabled));
   }
 
   function initFollowAndFavorite(company) {
     const favoriteBtn = document.getElementById('favoriteCompanyBtn');
+    if (!favoriteBtn) return;
 
     const raw = localStorage.getItem('ApplyAI.currentUser');
     const user = raw ? safeJsonParse(raw, null) : null;
     const email = String(user?.email || '').trim().toLowerCase();
-    const role = String(user?.role || '').trim().toLowerCase();
+    const role = normalizeRole(user?.role);
 
     const service = window.ApplyAI?.followedCompanies;
     if (!service || !email || role !== 'candidato') return;
 
     const companyPayload = {
-      id: String(company?.id || ''),
+      id: String(company?.id || slugify(company?.name || '') || ''),
       name: String(company?.name || ''),
       industry: String(company?.industry || ''),
       location: String(company?.location || ''),
@@ -299,16 +344,25 @@
       tagline: String(company?.tagline || ''),
     };
 
+    if (!companyPayload.id || !companyPayload.name) {
+      applyFollowUiState(false, {
+        disabled: true,
+        label: 'No disponible',
+        title: 'No se pudo identificar la empresa para seguirla',
+      });
+      return;
+    }
+
     const refresh = () => {
       const following = service.isFollowing(email, companyPayload.id);
-      applyFollowUiState(Boolean(following));
+      applyFollowUiState(Boolean(following), { disabled: false });
     };
 
     refresh();
 
     const toggle = () => {
       const nowFollowing = service.toggle(email, companyPayload);
-      applyFollowUiState(Boolean(nowFollowing));
+      applyFollowUiState(Boolean(nowFollowing), { disabled: false });
 
       if (nowFollowing) {
         showToast('¡Empresa añadida a favoritas!', 'success');
@@ -317,7 +371,8 @@
       }
     };
 
-    if (favoriteBtn && !favoriteBtn.disabled) {
+    if (!favoriteBtn.dataset.followBound && !favoriteBtn.disabled) {
+      favoriteBtn.dataset.followBound = 'true';
       favoriteBtn.addEventListener('click', toggle);
     }
   }
