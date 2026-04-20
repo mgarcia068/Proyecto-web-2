@@ -243,13 +243,16 @@
     if (logoutBtn) {
       logoutBtn.hidden = !isAllowed;
       logoutBtn.addEventListener('click', function () {
-        try {
-          localStorage.removeItem(STORAGE_KEYS.currentUser);
-        } catch (_) {
-          // ignore
+        if (typeof handleGlobalLogout === 'function') {
+          handleGlobalLogout();
+        } else {
+          try {
+            localStorage.removeItem(STORAGE_KEYS.currentUser);
+          } catch (_) {
+            // ignore
+          }
+          window.location.href = 'index.html';
         }
-
-        window.location.href = 'index.html';
       });
     }
 
