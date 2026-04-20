@@ -48,14 +48,15 @@
           .join(' • ');
 
         return `
-          <article class="card card--flat" style="padding: var(--space-4)">
-            <div class="flex flex-col" style="gap: var(--space-3)">
-              <div class="flex flex-col" style="gap: var(--space-1)">
-                <div class="text-display" style="font-size: var(--text-base)">${escapeHtml(company?.name || 'Empresa')}</div>
-                <div class="text-xs text-muted">${escapeHtml(meta || '—')}</div>
+          <article class="card card--flat favorite-company-card">
+            <div class="favorite-company-card__content">
+              <div class="favorite-company-card__head">
+                <span class="favorite-company-card__tag">Seguida</span>
+                <div class="text-display favorite-company-card__name">${escapeHtml(company?.name || 'Empresa')}</div>
+                <div class="favorite-company-card__meta">${escapeHtml(meta || '—')}</div>
               </div>
 
-              <div class="flex items-center justify-between" style="gap: var(--space-2)">
+              <div class="favorite-company-card__actions">
                 <button class="btn btn--secondary btn--sm" type="button" data-action="view" data-company-id="${escapeHtml(id)}">
                   Ver empresa
                 </button>
