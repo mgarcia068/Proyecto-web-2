@@ -303,7 +303,7 @@
             }
 
             const actionsHtml = actions.length
-              ? `<div class="applications-list__actions" style="display: flex; gap: var(--space-2); flex-wrap: wrap;">${actions.join('')}</div>`
+              ? `<div class="applications-list__actions">${actions.join('')}</div>`
               : '';
 
             return `

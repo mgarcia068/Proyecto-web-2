@@ -1,12 +1,60 @@
 (function () {
   const PROFILE_VERSION = 1;
+  const CV_AI_DAILY_LIMIT = 3;
 
   const PHOTO_EDITOR_SCALE = 1.18;
 
   const STORAGE_KEYS = {
     currentUser: 'ApplyAI.currentUser',
     profilePrefix: 'ApplyAI.candidateProfile:',
+    cvAiDailyUsagePrefix: 'ApplyAI.candidateCvAiDailyUsage:',
   };
+
+  function getLocalDateKey() {
+    const now = new Date();
+    const yyyy = String(now.getFullYear());
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function getCvAiDailyUsageKey(email, dateKey) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const safeDateKey = String(dateKey || getLocalDateKey()).trim();
+    return `${STORAGE_KEYS.cvAiDailyUsagePrefix}${normalizedEmail}:${safeDateKey}`;
+  }
+
+  function getCvAiDailyUsage(email, dateKey) {
+    if (!email) return 0;
+    const key = getCvAiDailyUsageKey(email, dateKey);
+    const raw = localStorage.getItem(key);
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+    return Math.floor(parsed);
+  }
+
+  function setCvAiDailyUsage(email, count, dateKey) {
+    if (!email) return;
+    const key = getCvAiDailyUsageKey(email, dateKey);
+    const safe = Math.max(0, Math.floor(Number(count) || 0));
+    localStorage.setItem(key, String(safe));
+  }
+
+  function incrementCvAiDailyUsage(email, dateKey) {
+    const current = getCvAiDailyUsage(email, dateKey);
+    const next = current + 1;
+    setCvAiDailyUsage(email, next, dateKey);
+    return next;
+  }
+
+  function getCvAiRemainingDailyUsage(email, dateKey) {
+    const used = getCvAiDailyUsage(email, dateKey);
+    return Math.max(0, CV_AI_DAILY_LIMIT - used);
+  }
+
+  function hasCvAiReachedDailyLimit(email, dateKey) {
+    return getCvAiDailyUsage(email, dateKey) >= CV_AI_DAILY_LIMIT;
+  }
 
   function safeJsonParse(value, fallback) {
     try {
@@ -264,9 +312,19 @@
     const email = document.getElementById('email');
 
     const headline = document.getElementById('headline');
+    const academicBackground = document.getElementById('academicBackground');
+    const workExperience = document.getElementById('workExperience');
+    const technicalSkills = document.getElementById('technicalSkills');
+    const technicalSkillsCards = document.getElementById('technicalSkillsCards');
+    const technicalSkillsError = document.getElementById('technicalSkillsError');
+    const languages = document.getElementById('languages');
+    const languagesCards = document.getElementById('languagesCards');
+    const languagesError = document.getElementById('languagesError');
     const location = document.getElementById('location');
     const phone = document.getElementById('phone');
     const about = document.getElementById('about');
+
+    const profileCatalogApi = window.ApplyAI?.profileCatalogApi || null;
 
     const photoInput = document.getElementById('profilePhoto');
     const photoError = document.getElementById('profilePhotoError');
@@ -308,6 +366,377 @@
 
     const photoUploadLabel = photoInput ? photoInput.closest('label.form-file') : null;
     const cvUploadLabel = cvInput ? cvInput.closest('label.form-file') : null;
+
+    let technicalSkillsItems = [];
+    let languagesItems = [];
+    let catalogReady = false;
+
+    function normalizeToken(value) {
+      return String(value || '')
+        .trim()
+        .replace(/\s+/g, ' ');
+    }
+
+    function uniqueTokens(list) {
+      const seen = new Set();
+      return list.filter((item) => {
+        const key = String(item || '').toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function parseTokenList(value) {
+      if (Array.isArray(value)) {
+        return uniqueTokens(value.map(normalizeToken).filter(Boolean));
+      }
+
+      return uniqueTokens(
+        String(value || '')
+          .split(/[,;\n]+/)
+          .map(normalizeToken)
+          .filter(Boolean)
+      );
+    }
+
+    function stringifyTokenList(list) {
+      return uniqueTokens(Array.isArray(list) ? list.map(normalizeToken).filter(Boolean) : []).join(', ');
+    }
+
+    function getTokenInputByKind(kind) {
+      if (kind === 'technicalSkills') return technicalSkills;
+      if (kind === 'languages') return languages;
+      return null;
+    }
+
+    function getTokenErrorByKind(kind) {
+      if (kind === 'technicalSkills') return technicalSkillsError;
+      if (kind === 'languages') return languagesError;
+      return null;
+    }
+
+    function setTokenFieldMessage(kind, message) {
+      const inputEl = getTokenInputByKind(kind);
+      const errorEl = getTokenErrorByKind(kind);
+      if (!inputEl || !errorEl) return;
+      setFieldError(inputEl, errorEl, String(message || '').trim());
+    }
+
+    function clearTokenFieldMessage(kind) {
+      setTokenFieldMessage(kind, '');
+    }
+
+    function normalizeSearchText(value) {
+      if (profileCatalogApi && typeof profileCatalogApi.normalize === 'function') {
+        return profileCatalogApi.normalize(value);
+      }
+
+      return String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function listCatalogOptions(kind) {
+      if (!catalogReady || !profileCatalogApi) return [];
+
+      if (kind === 'technicalSkills') {
+        return profileCatalogApi.listSkills();
+      }
+
+      if (kind === 'languages') {
+        return profileCatalogApi.listLanguages();
+      }
+
+      return [];
+    }
+
+    function filterCatalogOptions(kind, query) {
+      const q = normalizeSearchText(query);
+      if (!q) return [];
+
+      return listCatalogOptions(kind)
+        .filter((option) => normalizeSearchText(option).includes(q))
+        .slice(0, 8);
+    }
+
+    function setupTokenAutocomplete(kind, inputEl) {
+      if (!inputEl) return;
+      if (inputEl.dataset.catalogAutocompleteReady === 'true') return;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'autocomplete-wrapper';
+      wrapper.style.position = 'relative';
+
+      inputEl.parentNode.insertBefore(wrapper, inputEl);
+      wrapper.appendChild(inputEl);
+
+      const list = document.createElement('ul');
+      list.className = 'autocomplete-list';
+      wrapper.appendChild(list);
+
+      function renderOptions() {
+        const query = String(inputEl.value || '').trim();
+        if (!query || !catalogReady) {
+          list.innerHTML = '';
+          list.classList.remove('show');
+          return;
+        }
+
+        const options = filterCatalogOptions(kind, query);
+        list.innerHTML = '';
+
+        if (!options.length) {
+          const liEmpty = document.createElement('li');
+          liEmpty.className = 'autocomplete-item text-muted';
+          liEmpty.textContent = 'No se encontraron resultados';
+          list.appendChild(liEmpty);
+          list.classList.add('show');
+          return;
+        }
+
+        options.forEach((optionValue) => {
+          const li = document.createElement('li');
+          li.className = 'autocomplete-item';
+          li.innerHTML = `<strong>${optionValue}</strong>`;
+          li.addEventListener('mousedown', () => {
+            inputEl.value = optionValue;
+            list.classList.remove('show');
+            inputEl.focus();
+          });
+          list.appendChild(li);
+        });
+
+        list.classList.add('show');
+      }
+
+      inputEl.addEventListener('input', function () {
+        clearTokenFieldMessage(kind);
+        renderOptions();
+      });
+
+      inputEl.addEventListener('focus', function () {
+        if (String(inputEl.value || '').trim()) {
+          renderOptions();
+        }
+      });
+
+      inputEl.addEventListener('blur', function () {
+        list.classList.remove('show');
+      });
+
+      inputEl.dataset.catalogAutocompleteReady = 'true';
+    }
+
+    function setupCatalogApi() {
+      const hasValidApi = Boolean(
+        profileCatalogApi &&
+          typeof profileCatalogApi.resolveSkill === 'function' &&
+          typeof profileCatalogApi.resolveLanguage === 'function' &&
+          typeof profileCatalogApi.listSkills === 'function' &&
+          typeof profileCatalogApi.listLanguages === 'function'
+      );
+
+      if (!hasValidApi) {
+        catalogReady = false;
+        if (technicalSkills) technicalSkills.disabled = true;
+        if (languages) languages.disabled = true;
+        setTokenFieldMessage('technicalSkills', 'No se pudo cargar el catálogo de habilidades.');
+        setTokenFieldMessage('languages', 'No se pudo cargar el catálogo de idiomas.');
+        return;
+      }
+
+      catalogReady = true;
+
+      if (technicalSkills) technicalSkills.disabled = false;
+      if (languages) languages.disabled = false;
+
+      setupTokenAutocomplete('technicalSkills', technicalSkills);
+      setupTokenAutocomplete('languages', languages);
+
+      clearTokenFieldMessage('technicalSkills');
+      clearTokenFieldMessage('languages');
+    }
+
+    function resolveTokenFromCatalog(kind, value) {
+      if (!catalogReady || !profileCatalogApi) return null;
+
+      const token = normalizeToken(value);
+      if (!token) return null;
+
+      if (kind === 'technicalSkills') {
+        return profileCatalogApi.resolveSkill(token);
+      }
+      if (kind === 'languages') {
+        return profileCatalogApi.resolveLanguage(token);
+      }
+      return null;
+    }
+
+    function filterTokensByCatalog(kind, tokens) {
+      return uniqueTokens(
+        (Array.isArray(tokens) ? tokens : [])
+          .map((token) => resolveTokenFromCatalog(kind, token))
+          .filter(Boolean)
+      );
+    }
+
+    function getTokenItemsByKind(kind) {
+      if (kind === 'technicalSkills') return technicalSkillsItems;
+      if (kind === 'languages') return languagesItems;
+      return [];
+    }
+
+    function setTokenItemsByKind(kind, items) {
+      const safeItems = uniqueTokens(Array.isArray(items) ? items.map(normalizeToken).filter(Boolean) : []);
+      if (kind === 'technicalSkills') {
+        technicalSkillsItems = safeItems;
+        return;
+      }
+      if (kind === 'languages') {
+        languagesItems = safeItems;
+      }
+    }
+
+    function renderTokenCards(listEl, kind, items) {
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      const fragment = document.createDocumentFragment();
+
+      items.forEach((item) => {
+        const chip = document.createElement('span');
+        chip.className = 'skill-chip profile-token-chip';
+
+        const label = document.createElement('span');
+        label.textContent = item;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'profile-token__remove';
+        removeBtn.setAttribute('aria-label', `Quitar ${item}`);
+        removeBtn.setAttribute('data-token-remove', 'true');
+        removeBtn.setAttribute('data-token-kind', kind);
+        removeBtn.setAttribute('data-token-value', item);
+        removeBtn.textContent = '×';
+
+        chip.appendChild(label);
+        chip.appendChild(removeBtn);
+        fragment.appendChild(chip);
+      });
+
+      listEl.appendChild(fragment);
+    }
+
+    function syncTokenCardsUi() {
+      renderTokenCards(technicalSkillsCards, 'technicalSkills', technicalSkillsItems);
+      renderTokenCards(languagesCards, 'languages', languagesItems);
+    }
+
+    function addTokensToKind(kind, rawValue) {
+      const nextTokens = parseTokenList(rawValue);
+      if (!nextTokens.length) return { added: 0, invalidTokens: [] };
+
+      const validTokens = [];
+      const invalidTokens = [];
+
+      nextTokens.forEach((token) => {
+        const resolvedToken = resolveTokenFromCatalog(kind, token);
+        if (resolvedToken) {
+          validTokens.push(resolvedToken);
+        } else {
+          invalidTokens.push(token);
+        }
+      });
+
+      const existing = getTokenItemsByKind(kind);
+      const merged = uniqueTokens([...existing, ...validTokens]);
+      const added = merged.length - existing.length;
+      setTokenItemsByKind(kind, merged);
+      return {
+        added,
+        invalidTokens: uniqueTokens(invalidTokens),
+      };
+    }
+
+    function commitTokenInput(kind) {
+      const inputEl = getTokenInputByKind(kind);
+      if (!inputEl) {
+        return { added: 0, invalidTokens: [] };
+      }
+
+      const result = addTokensToKind(kind, inputEl.value || '');
+
+      if (result.invalidTokens.length) {
+        const sample = result.invalidTokens.slice(0, 2).join(', ');
+        const suffix = result.invalidTokens.length > 2 ? '…' : '';
+        setTokenFieldMessage(kind, `No está en el catálogo: ${sample}${suffix}`);
+      } else {
+        clearTokenFieldMessage(kind);
+      }
+
+      if (result.added > 0) {
+        inputEl.value = '';
+        syncTokenCardsUi();
+        return result;
+      }
+
+      if (!result.invalidTokens.length) {
+        inputEl.value = '';
+      } else {
+        inputEl.value = String(inputEl.value || '').trim();
+      }
+
+      return result;
+    }
+
+    function removeTokenFromKind(kind, tokenValue) {
+      const normalizedToken = normalizeToken(tokenValue);
+      if (!normalizedToken) return false;
+
+      const existing = getTokenItemsByKind(kind);
+      const next = existing.filter((item) => String(item).toLowerCase() !== normalizedToken.toLowerCase());
+
+      if (next.length === existing.length) return false;
+
+      setTokenItemsByKind(kind, next);
+      syncTokenCardsUi();
+      return true;
+    }
+
+    function hydrateTokenFieldsFromProfile(profile) {
+      const storedSkills = parseTokenList(profile?.technicalSkillsList || profile?.technicalSkills || '');
+      const storedLanguages = parseTokenList(profile?.languagesList || profile?.languages || '');
+
+      setTokenItemsByKind('technicalSkills', filterTokensByCatalog('technicalSkills', storedSkills));
+      setTokenItemsByKind('languages', filterTokensByCatalog('languages', storedLanguages));
+      syncTokenCardsUi();
+
+      if (technicalSkills) technicalSkills.value = '';
+      if (languages) languages.value = '';
+      clearTokenFieldMessage('technicalSkills');
+      clearTokenFieldMessage('languages');
+    }
+
+    function buildTokenProfileFields() {
+      const technicalSkillsValue = stringifyTokenList(technicalSkillsItems);
+      const languagesValue = stringifyTokenList(languagesItems);
+
+      return {
+        technicalSkills: technicalSkillsValue,
+        technicalSkillsList: technicalSkillsItems.slice(),
+        languages: languagesValue,
+        languagesList: languagesItems.slice(),
+      };
+    }
+
+    function commitPendingTokenDrafts() {
+      const technicalResult = commitTokenInput('technicalSkills');
+      const languagesResult = commitTokenInput('languages');
+      return technicalResult.added > 0 || languagesResult.added > 0;
+    }
 
     function hasPhoto(profile) {
       return Boolean(profile && String(profile.photoDataUrl || '').trim());
@@ -413,8 +842,22 @@
       const profile = getCandidateProfile(userEmail) || {};
 
       const headlineText = String(headline?.value || profile.headline || '').trim();
+      const academicBackgroundText = String(academicBackground?.value || profile.academicBackground || '').trim();
+      const workExperienceText = String(workExperience?.value || profile.workExperience || '').trim();
+      const profileSkills = filterTokensByCatalog('technicalSkills', technicalSkillsItems.length ? technicalSkillsItems : parseTokenList(profile.technicalSkillsList || profile.technicalSkills || ''));
+      const profileLanguages = filterTokensByCatalog('languages', languagesItems.length ? languagesItems : parseTokenList(profile.languagesList || profile.languages || ''));
+      const draftSkills = filterTokensByCatalog('technicalSkills', parseTokenList(technicalSkills?.value || ''));
+      const draftLanguages = filterTokensByCatalog('languages', parseTokenList(languages?.value || ''));
+      const technicalSkillsText = stringifyTokenList([
+        ...profileSkills,
+        ...draftSkills,
+      ]);
+      const languagesText = stringifyTokenList([
+        ...profileLanguages,
+        ...draftLanguages,
+      ]);
       const aboutText = String(about?.value || profile.about || '').trim();
-      const mergedText = `${headlineText} ${aboutText}`.trim();
+      const mergedText = `${headlineText} ${academicBackgroundText} ${workExperienceText} ${technicalSkillsText} ${languagesText} ${aboutText}`.trim();
       const hasUploadedCv = hasCv(profile);
 
       const keywordHits = countKeywordHits(mergedText, CV_AI_KEYWORDS);
@@ -436,8 +879,8 @@
         ? 'Análisis visual generado en modo demo IA.'
         : 'Análisis visual generado con la información de tu perfil.';
 
-      if (!headlineText && !aboutText) {
-        status = 'Completá título y descripción para obtener una evaluación más útil.';
+      if (!headlineText && !academicBackgroundText && !workExperienceText && !technicalSkillsText && !languagesText && !aboutText) {
+        status = 'Completá más campos del perfil para obtener una evaluación más útil.';
       }
 
       return {
@@ -469,20 +912,62 @@
       setCvAiMetric(cvAiSkillsValue, cvAiSkillsFill, evaluation.skills);
       setCvAiMetric(cvAiExperienceValue, cvAiExperienceFill, evaluation.experience);
 
-      if (cvAiStatus) cvAiStatus.textContent = String(evaluation.status || 'Evaluación visual lista.');
+      if (cvAiStatus) {
+        const baseStatus = String(evaluation.status || 'Evaluación visual lista.');
+        const remaining = getCvAiRemainingDailyUsage(userEmail);
+
+        if (remaining <= 0) {
+          cvAiStatus.textContent = `Ya usaste tus ${CV_AI_DAILY_LIMIT} análisis de IA de hoy (solo CV). Volvé mañana para continuar.`;
+        } else {
+          cvAiStatus.textContent = `${baseStatus} Te quedan ${remaining} análisis de IA hoy (solo CV).`;
+        }
+      }
+    }
+
+    function syncCvAiDailyLimitUi() {
+      if (!runCvAiEvalBtn || !isAllowed) return;
+
+      const remaining = getCvAiRemainingDailyUsage(userEmail);
+
+      if (remaining <= 0) {
+        runCvAiEvalBtn.disabled = true;
+        runCvAiEvalBtn.textContent = 'Límite diario alcanzado';
+
+        if (cvAiStatus) {
+          cvAiStatus.textContent = `Ya usaste tus ${CV_AI_DAILY_LIMIT} análisis de IA de hoy (solo CV). Volvé mañana para continuar.`;
+        }
+        return;
+      }
+
+      runCvAiEvalBtn.disabled = false;
+      if (runCvAiEvalBtn.textContent === 'Límite diario alcanzado') {
+        runCvAiEvalBtn.textContent = 'Analizar CV con IA';
+      }
     }
 
     function runCvAiEvaluationSimulation() {
       if (!runCvAiEvalBtn) return;
 
+      if (hasCvAiReachedDailyLimit(userEmail)) {
+        syncCvAiDailyLimitUi();
+        return;
+      }
+
       runCvAiEvalBtn.disabled = true;
       runCvAiEvalBtn.textContent = 'Analizando...';
       if (cvAiStatus) cvAiStatus.textContent = 'Procesando CV con IA (demo visual)...';
 
+      incrementCvAiDailyUsage(userEmail);
+
       window.setTimeout(() => {
         renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: true }));
-        runCvAiEvalBtn.disabled = false;
-        runCvAiEvalBtn.textContent = 'Volver a analizar';
+
+        if (!hasCvAiReachedDailyLimit(userEmail)) {
+          runCvAiEvalBtn.disabled = false;
+          runCvAiEvalBtn.textContent = 'Volver a analizar';
+        }
+
+        syncCvAiDailyLimitUi();
       }, 900);
     }
 
@@ -519,6 +1004,8 @@
     if (email) email.value = userEmail;
     if (fullName) fullName.value = userName;
 
+    setupCatalogApi();
+
     if (!isAllowed) {
       // Dejar el formulario visible pero no editable para no romper UX.
       form.querySelectorAll('input, textarea, button').forEach((el) => {
@@ -536,9 +1023,13 @@
     }
 
     const storedProfile = getCandidateProfile(userEmail);
+    hydrateTokenFieldsFromProfile(storedProfile);
+
     if (storedProfile) {
       setFieldValue('fullName', storedProfile.fullName || userName);
       setFieldValue('headline', storedProfile.headline || '');
+      setFieldValue('academicBackground', storedProfile.academicBackground || '');
+      setFieldValue('workExperience', storedProfile.workExperience || '');
       setFieldValue('location', storedProfile.location || '');
       setFieldValue('phone', storedProfile.phone || '');
       setFieldValue('about', storedProfile.about || '');
@@ -577,6 +1068,7 @@
     syncPhotoUi(storedProfile);
     syncCvUi(storedProfile);
     renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+    syncCvAiDailyLimitUi();
 
     if (typeof geoService !== 'undefined') {
       geoService.setupAutocomplete('#location');
@@ -597,6 +1089,72 @@
     if (headline) {
       headline.addEventListener('blur', function () {
         renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+      });
+    }
+
+    if (academicBackground) {
+      academicBackground.addEventListener('blur', function () {
+        renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+      });
+    }
+
+    if (workExperience) {
+      workExperience.addEventListener('blur', function () {
+        renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+      });
+    }
+
+    if (technicalSkills) {
+      technicalSkills.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const result = commitTokenInput('technicalSkills');
+        if (result.added > 0) {
+          renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+        }
+      });
+
+      technicalSkills.addEventListener('blur', function () {
+        renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+      });
+    }
+
+    if (languages) {
+      languages.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const result = commitTokenInput('languages');
+        if (result.added > 0) {
+          renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+        }
+      });
+
+      languages.addEventListener('blur', function () {
+        renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+      });
+    }
+
+    if (technicalSkillsCards) {
+      technicalSkillsCards.addEventListener('click', function (e) {
+        const btn = e.target.closest('button[data-token-remove="true"]');
+        if (!btn) return;
+
+        const value = String(btn.getAttribute('data-token-value') || '').trim();
+        if (removeTokenFromKind('technicalSkills', value)) {
+          renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+        }
+      });
+    }
+
+    if (languagesCards) {
+      languagesCards.addEventListener('click', function (e) {
+        const btn = e.target.closest('button[data-token-remove="true"]');
+        if (!btn) return;
+
+        const value = String(btn.getAttribute('data-token-value') || '').trim();
+        if (removeTokenFromKind('languages', value)) {
+          renderCvAiEvaluation(buildCvAiEvaluation({ withJitter: false }));
+        }
       });
     }
 
@@ -720,6 +1278,9 @@
         return;
       }
 
+      commitPendingTokenDrafts();
+      const tokenFields = buildTokenProfileFields();
+
       const existing = existingProfile;
       const nowIso = new Date().toISOString();
       saveCandidateProfile(userEmail, {
@@ -727,6 +1288,12 @@
         email: userEmail,
         fullName: String(fullName?.value || userName || '').trim(),
         headline: String(headline?.value || '').trim(),
+        academicBackground: String(academicBackground?.value || '').trim(),
+        workExperience: String(workExperience?.value || '').trim(),
+        technicalSkills: tokenFields.technicalSkills,
+        technicalSkillsList: tokenFields.technicalSkillsList,
+        languages: tokenFields.languages,
+        languagesList: tokenFields.languagesList,
         location: String(location?.value || '').trim(),
         phone: String(phone?.value || '').trim(),
         about: String(about?.value || '').trim(),
@@ -895,6 +1462,8 @@
 
         const profile = getCandidateProfile(userEmail) || {};
         const nowIso = new Date().toISOString();
+        commitPendingTokenDrafts();
+        const tokenFields = buildTokenProfileFields();
 
         // Aplicar al avatar y persistir.
         if (avatarPreview && avatarFallback) {
@@ -916,6 +1485,12 @@
           email: userEmail,
           fullName: String(fullName?.value || userName || '').trim(),
           headline: String(headline?.value || '').trim(),
+          academicBackground: String(academicBackground?.value || profile.academicBackground || '').trim(),
+          workExperience: String(workExperience?.value || profile.workExperience || '').trim(),
+          technicalSkills: tokenFields.technicalSkills,
+          technicalSkillsList: tokenFields.technicalSkillsList,
+          languages: tokenFields.languages,
+          languagesList: tokenFields.languagesList,
           location: String(location?.value || '').trim(),
           phone: String(phone?.value || '').trim(),
           about: String(about?.value || '').trim(),
@@ -1003,15 +1578,23 @@
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      commitPendingTokenDrafts();
       if (!validate()) return;
 
       const existing = getCandidateProfile(userEmail) || {};
       const photoPan = getPhotoPan(existing);
+      const tokenFields = buildTokenProfileFields();
       const nextProfile = {
         version: PROFILE_VERSION,
         email: userEmail,
         fullName: String(fullName?.value || userName || '').trim(),
         headline: String(headline?.value || '').trim(),
+        academicBackground: String(academicBackground?.value || '').trim(),
+        workExperience: String(workExperience?.value || '').trim(),
+        technicalSkills: tokenFields.technicalSkills,
+        technicalSkillsList: tokenFields.technicalSkillsList,
+        languages: tokenFields.languages,
+        languagesList: tokenFields.languagesList,
         location: String(location?.value || '').trim(),
         phone: String(phone?.value || '').trim(),
         about: String(about?.value || '').trim(),

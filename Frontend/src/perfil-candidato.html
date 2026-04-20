@@ -18,6 +18,7 @@
 
     <script src="utils/theme.js?v=1.1"></script>
     <script src="utils/geo-api.js?v=1.1"></script>
+    <script src="utils/profile-catalog-api.js?v=1.0"></script>
     <script src="js/components.js?v=1.2" defer></script>
     <script src="js/profile-candidato.js" defer></script>
   </head>
@@ -129,6 +130,58 @@
                         />
                       </div>
 
+                      <div class="form-group">
+                        <label class="form-label" for="academicBackground">Formación académica</label>
+                        <textarea
+                          class="form-textarea"
+                          id="academicBackground"
+                          name="academicBackground"
+                          placeholder="Ej: Lic. en Sistemas (UNC, 2021), cursos y certificaciones relevantes"
+                          style="min-height: 96px"
+                        ></textarea>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-label" for="workExperience">Experiencia laboral</label>
+                        <textarea
+                          class="form-textarea"
+                          id="workExperience"
+                          name="workExperience"
+                          placeholder="Describí tus roles, años de experiencia y logros clave"
+                          style="min-height: 108px"
+                        ></textarea>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-label" for="technicalSkills">Habilidades técnicas</label>
+                        <input
+                          class="form-input"
+                          id="technicalSkills"
+                          name="technicalSkills"
+                          type="text"
+                          placeholder="Ej: React, Node.js, SQL, Docker, Testing"
+                          autocomplete="off"
+                        />
+                        <div class="form-hint profile-token-hint">Presioná Enter para agregar cada habilidad.</div>
+                        <div class="form-error" id="technicalSkillsError"></div>
+                        <div class="profile-token-list applicant-card__skills" id="technicalSkillsCards" aria-live="polite"></div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="form-label" for="languages">Idiomas</label>
+                        <input
+                          class="form-input"
+                          id="languages"
+                          name="languages"
+                          type="text"
+                          placeholder="Ej: Español, Inglés"
+                          autocomplete="off"
+                        />
+                        <div class="form-hint profile-token-hint">Presioná Enter para agregar cada idioma.</div>
+                        <div class="form-error" id="languagesError"></div>
+                        <div class="profile-token-list applicant-card__skills" id="languagesCards" aria-live="polite"></div>
+                      </div>
+
                       <div class="grid grid-2">
                         <div class="form-group">
                           <label class="form-label" for="location">Ubicación</label>
@@ -210,6 +263,7 @@
                             <div class="cv-ai__eyebrow">Analisis asistido</div>
                             <h3 class="text-display" style="font-size: var(--text-md)">Score del currículum</h3>
                             <p class="text-xs text-muted">Puntuación visual basada en claridad, habilidades y experiencia.</p>
+                            <p class="text-xs text-muted">Límite IA: 3 análisis diarios (solo para este análisis de CV).</p>
                           </div>
                           <span class="badge badge--accent cv-ai__badge">Demo IA</span>
                         </header>
