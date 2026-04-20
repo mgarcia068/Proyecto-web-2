@@ -42,7 +42,8 @@ function renderStats(containerId) {
   const totalPostulantes = POSTULANTES.length;
   const ofertasActivas   = OFERTAS.filter(o => o.estado === 'activa').length;
   const totalOfertas     = OFERTAS.length;
-  const matchPromedio    = Math.round(POSTULANTES.reduce((a, p) => a + p.match, 0) / POSTULANTES.length);
+  const enEntrevista     = POSTULANTES.filter(p => p.estado === 'Entrevista').length;
+  const aceptados        = POSTULANTES.filter(p => p.estado === 'Aceptado').length;
 
   el.innerHTML = `
     <div class="stat-card">
@@ -53,7 +54,7 @@ function renderStats(containerId) {
         </div>
       </div>
       <div class="stat-card__value">${ofertasActivas}</div>
-      <div class="stat-card__delta">&#x2191; de ${totalOfertas} totales</div>
+      <div class="stat-card__delta" style="color: var(--color-success)">De ${totalOfertas} totales</div>
     </div>
 
     <div class="stat-card">
@@ -64,29 +65,37 @@ function renderStats(containerId) {
         </div>
       </div>
       <div class="stat-card__value">${totalPostulantes}</div>
-      <div class="stat-card__delta">&#x2191; esta semana</div>
+      <div class="stat-card__delta" style="color: var(--color-success)">Recibidos esta semana</div>
     </div>
 
     <div class="stat-card">
       <div class="stat-card__top">
-        <span class="stat-card__label">Match promedio IA</span>
+        <span class="stat-card__label">En Entrevista</span>
         <div class="stat-card__icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
         </div>
       </div>
-      <div class="stat-card__value">${matchPromedio}%</div>
-      <div class="stat-card__delta">Calculado por IA</div>
+      <div class="stat-card__value">${enEntrevista}</div>
+      <div class="stat-card__delta" style="color: var(--color-success)">Candidatos avanzando</div>
     </div>
 
     <div class="stat-card">
       <div class="stat-card__top">
-        <span class="stat-card__label">Total ofertas</span>
+        <span class="stat-card__label">Contratados</span>
         <div class="stat-card__icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
         </div>
       </div>
-      <div class="stat-card__value">${totalOfertas}</div>
-      <div class="stat-card__delta">Historial completo</div>
+      <div class="stat-card__value">${aceptados}</div>
+      <div class="stat-card__delta" style="color: var(--color-success)">Nuevos talentos sumados</div>
     </div>
   `;
 }
