@@ -565,7 +565,7 @@ function updateNavbarActions() {
       empresaPanelBtn.style.display = isEmpresa ? "" : "none";
     }
 
-    if (offersBtn) offersBtn.style.display = isEmpresa ? "none" : "";
+    if (offersBtn) offersBtn.style.display = "";
     if (favoritesBtn) favoritesBtn.style.display = isEmpresa ? "none" : "";
     if (applicationsBtn) applicationsBtn.style.display = isEmpresa ? "none" : "";
 
