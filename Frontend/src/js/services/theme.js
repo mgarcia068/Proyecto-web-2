@@ -1,4 +1,4 @@
-// utils/theme.js
+// js/services/theme.js
 const THEME_KEY = "applyai-theme";
 
 function applyTheme(theme) {
